@@ -17,7 +17,9 @@ public class RedisService {
     public boolean setIfAbsent(String key, String value) {
         return Boolean.TRUE.equals(  // null 값까지 커버하도록 핸들링
             redisTemplateDb0.opsForValue().setIfAbsent(
-                key, value, Duration.ofSeconds(10)
+                key,
+                value,  // 사용 시나리오에 따라서 키 값을 아무 값이나 쓰지 않고 실제 Caching 데이터로 쓰면 좋다
+                Duration.ofSeconds(10)  // 사용 시나리오에 따라 적절히 조정
             )
         );
     }

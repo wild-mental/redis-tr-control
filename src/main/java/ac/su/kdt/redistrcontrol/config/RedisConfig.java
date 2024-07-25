@@ -62,15 +62,16 @@ public class RedisConfig {
         RedisConnectionFactory redisConnectionFactory  // 없앨 수 있는지 확인 => 없음
         // 보일러 플레이트 -> 메서드 시그니처를 따르는 메서드가 반드시 필요한 경우가 많음
     ) {
-        StringRedisTemplate redisTemplate = new StringRedisTemplate();
-        // [Anti Pattern] redisTemplate 메서드 내에서 커넥션을 새롭게 "생성"
-        // redisTemplate.setConnectionFactory(redisConnectionFactory());
-        // Bean 으로 제작한 객체는 주입받아서 사용하자 -> 인자 부분 없애지 말기!
-
-        // [Good Pattern]
-        // 파라미터 주입 방식으로 Bean 을 받아서 Singleton 사용법을 준수
-        redisTemplate.setConnectionFactory(redisConnectionFactory);
-        return redisTemplate;
+//        StringRedisTemplate redisTemplate = new StringRedisTemplate();
+//        // [Anti Pattern] redisTemplate 메서드 내에서 커넥션을 새롭게 "생성"
+//        // redisTemplate.setConnectionFactory(redisConnectionFactory());
+//        // Bean 으로 제작한 객체는 주입받아서 사용하자 -> 인자 부분 없애지 말기!
+//
+//        // [Good Pattern]
+//        // 파라미터 주입 방식으로 Bean 을 받아서 Singleton 사용법을 준수
+//        redisTemplate.setConnectionFactory(redisConnectionFactory);
+//        return redisTemplate;
+        return new StringRedisTemplate(redisConnectionFactory);
     }
 
     @Bean
