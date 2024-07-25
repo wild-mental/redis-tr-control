@@ -26,6 +26,7 @@ public class RedisService {
         );
     }
 
+    // TODO : ProductTransactionService 로 이동
     // DB 캐싱을 겸하는 Transaction 검사용 메서드
     public Optional<Product> setIfAbsentGetIfPresent(String key, String value) {
         // 1) Object -> JSON String 언파싱
