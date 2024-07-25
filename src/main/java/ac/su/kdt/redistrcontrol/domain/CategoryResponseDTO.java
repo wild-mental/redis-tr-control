@@ -16,6 +16,7 @@ public class CategoryResponseDTO {
 
     // 1) 가장 단순한 형태로 참조 문제 해결하기 (객체 사용 포기)
     private Long parentId;  // 상위 카테고리 객체 타입이 아니라 id 로만 다루기
+    // 순환참조가 일어나는 필드를 포함하지 않게끔만 Long, String(toString()), Map<>
 
     public static CategoryResponseDTO fromCategory(Category category) {
         return new CategoryResponseDTO(

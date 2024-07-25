@@ -2,7 +2,9 @@ package ac.su.kdt.redistrcontrol.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.ArrayList;
@@ -12,15 +14,18 @@ import java.util.Map;
 
 @Entity
 @Getter @Setter
+@NoArgsConstructor
+@AllArgsConstructor
 public class Category {
     @Id
+    @GeneratedValue(strategy=GenerationType.IDENTITY)
     private Long id;
     private String name;
 
     private int depth;  // 최상위 1, 그 아래부터 2, 3, 4, ...
 
     @ManyToOne  // ToOne 이 FK 의 정의에 해당한다! 대상 키를 하나만 지정할 수 있으므로!
-    @JoinColumn(name = "parent_id")
+    @JoinColumn(name = "parent_id", nullable = true)
     private Category parent;  // 상위 카테고리 참조
 
     @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
