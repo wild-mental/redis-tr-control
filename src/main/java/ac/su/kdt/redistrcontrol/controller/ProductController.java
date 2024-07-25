@@ -1,6 +1,7 @@
 package ac.su.kdt.redistrcontrol.controller;
 
 import ac.su.kdt.redistrcontrol.domain.Product;
+import ac.su.kdt.redistrcontrol.domain.ProductForm;
 import ac.su.kdt.redistrcontrol.domain.ProductResponseDTO;
 import ac.su.kdt.redistrcontrol.service.ProductService;
 import lombok.RequiredArgsConstructor;
@@ -44,16 +45,17 @@ public class ProductController {
 
     @PostMapping
     public ResponseEntity<Product> createProduct(
-        @RequestBody Product product
-        // [과제] Redis Transaction 실제 로직 적용
-        // 1) ProductDTO 형태로 만들고 예제 호출 POSTMAN 생성
-        // 2) ProductTransactionController 를 만들고,
-        //    redis 에서 발급받은 키가 제출되어야만 후속 create 로직 수행하도록 엔드포인트 구현
-        // 3) 10초 범위를 따닥 및 중복 호출 방지하고자 하는 시간 구간에 맞추어서 조절 및 테스트 수행
-        //   => 프론트엔드 이벤트와 붙여서 테스트하면 가장 좋음
+        // @RequestBody Product product  // [수정] Product 생성 시, Category 가 부산물로 함께 생성되는 것은 자연스럽지 못함
+        @RequestBody ProductForm product
     ) {
         try {
-            Product createdProduct = productService.createProduct(product);
+            // [과제] Redis Transaction 실제 로직 적용
+            // 1) ProductDTO 형태로 만들고 예제 호출 POSTMAN 생성
+            // 2) ProductTransactionController 를 만들고,
+            //    redis 에서 발급받은 키가 제출되어야만 후속 create 로직 수행하도록 엔드포인트 구현
+            // 3) 10초 범위를 따닥 및 중복 호출 방지하고자 하는 시간 구간에 맞추어서 조절 및 테스트 수행
+            //   => 프론트엔드 이벤트와 붙여서 테스트하면 가장 좋음
+            Product createdProduct = productService.createProduct(product.toEntity());
             return new ResponseEntity<>(createdProduct, HttpStatus.CREATED);
         } catch (Exception e) {
             return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
