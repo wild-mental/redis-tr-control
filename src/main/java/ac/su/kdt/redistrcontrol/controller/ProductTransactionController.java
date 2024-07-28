@@ -4,6 +4,7 @@ import ac.su.kdt.redistrcontrol.domain.Product;
 import ac.su.kdt.redistrcontrol.domain.ProductForm;
 import ac.su.kdt.redistrcontrol.service.ProductService;
 import ac.su.kdt.redistrcontrol.service.RedisService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,9 @@ public class ProductTransactionController {
     private final ProductService productService;
     private final RedisService redisService;
 
+    // ####################################################
+    // 1) Transaction Key 중복 시 회복 없이 에러 응답하는 엔드포인트
+    // ####################################################
     // Post 요청 전 TransactionKey 발급된 것을 전제로 함
     @PostMapping
     public ResponseEntity<Product> createProduct(
@@ -50,7 +54,53 @@ public class ProductTransactionController {
         return new ResponseEntity<>(HttpStatus.CONFLICT);
     }
 
-    // Post 요청 전 TransactionKey 발급된 것을 전제로 함
+    // ####################################################
+    // 2) Transaction Key 중복 시 흐름 회복을 위한 Read-Write 분리
+    // ####################################################
+    // 2-1) 캐시 write
+    @PostMapping("/cache-write-test")
+    public ResponseEntity<Boolean> writeProductCache(
+        @RequestParam(name = "transaction-key") String transactionKey,
+        @RequestBody ProductForm product
+    ) {
+        // product 가 수신되면 set 부터 수행 동작 확인
+        boolean isSet = redisService.setProduct(transactionKey, product.toEntity());
+        return new ResponseEntity<>(isSet, HttpStatus.OK);
+    }
+    // 2-2) 캐시 read
+    @GetMapping("/cache-read-test")
+    public ResponseEntity<Product> readProductCache(
+        @RequestParam(name = "transaction-key") String transactionKey
+    ) {
+        Product productFromCache = redisService.getProduct(transactionKey);
+        return new ResponseEntity<>(productFromCache, HttpStatus.OK);
+    }
+
+    // ####################################################
+    // 3) Transaction Key 중복 시 흐름 회복을 적용한 상품 등록
+    // ####################################################
+    // 3-1) [과제] setIfAbsent 로직에 대한 상세 핸들링 이해하기
+    @PostMapping("/cached-create")
+    public ResponseEntity<Product> cachedProductCreate(
+        @RequestParam(name = "transaction-key") String transactionKey,
+        @RequestBody ProductForm product
+    ){
+        // 1. 더미값으로 캐시 키 등록 시도
+        //   1-1. 더미값 캐시 키 등록 성공 시 상품 등록
+        //     1-1-1. 상품 등록 성공 시 등록된 상품 id 를 포함한 상품 데이터 캐싱 시도
+        //       1-1-1-1. 상품 데이터 캐싱 성공 시 응답 반환
+        //       1-1-1-2. 상품 데이터 캐싱 실패 시 상품 Transaction 롤백 후 에러 응답 반환
+        //     1-1-2. 상품 등록 실패 시 키 삭제 후 에러 응답 반환
+        //   1-2. 더미값 캐시 키 등록 실패 시 해당 키로 캐싱된 데이터 read
+        //     1-2-1. 캐싱된 데이터가 상품 데이터로 반환될 경우 응답 반환
+        //     1-2-2. 캐싱된 데이터가 더미값인 경우 2회 재시도하며 상품 데이터로 업데이트 되는지 검사
+        //     1-2-2-1. 재시도 과정에서 상품 데이터로 조회될 경우 응답 반환
+        //     1-2-2-2. 재시도 과정에서 상품 데이터로 조회되지 않을 경우 실패 응답 반환
+        return null;  // 응답 place holding
+    }
+
+    // 3-2) service 클래스로 주요 작업을 넘겨 controller 코드 단순화
+    //      setIfAbsentGetIfPresent 메서드 로직 다듬어야 함
     @PostMapping("/with-cache1")
     public ResponseEntity<Product> createProduct2(
         @RequestParam(name = "transaction-key") String transactionKey,
@@ -58,10 +108,8 @@ public class ProductTransactionController {
     ) {
         // 요청 수신 후, transactionKey 부터 검사
         Optional<Product> createdProduct = redisService.setIfAbsentGetIfPresent(
-            // 복잡도가 높아서 다른 코드 흐름으로 대체
             transactionKey,
-            // LocalDateTime.now().toString()
-            product.toEntity()
+            product.toEntity()  // LocalDateTime.now().toString()
         );
         if (createdProduct.isEmpty()) {
             try {
@@ -72,36 +120,5 @@ public class ProductTransactionController {
             }
         }
         return new ResponseEntity<>(createdProduct.get(), HttpStatus.CREATED);
-    }
-
-    @PostMapping("/cache-write-test")
-    public ResponseEntity<Boolean> writeProductCache(
-        @RequestParam(name = "transaction-key") String transactionKey,
-        @RequestBody ProductForm product
-    ) {
-        // product 가 수신되면 set 부터 수행 동작 확인
-        boolean isSet = redisService.setProduct(transactionKey, product.toEntity());
-        return new ResponseEntity<>(isSet, HttpStatus.OK);
-    }
-
-    @GetMapping("/cache-read-test")
-    public ResponseEntity<Product> readProductCache(
-        @RequestParam(name = "transaction-key") String transactionKey
-    ) {
-        Product productFromCache = redisService.getProduct(transactionKey);
-        return new ResponseEntity<>(productFromCache, HttpStatus.OK);
-    }
-
-    // 1) transactionKey 에 대한 캐시값이 있는지 확인한다 (get 호출)
-    //    1-1) 없는 경우 정상 흐름 진행
-    //       1-2-1) 정상 흐름 진행 완료 후 응답데이터 캐싱
-    //    1-2) 있는 경우 캐싱된 데이터 받아서 응답
-    @PostMapping("/cached-create")
-    public ResponseEntity<Product> cachedProductCreate(
-        @RequestParam(name = "transaction-key") String transactionKey,
-        @RequestBody ProductForm product
-    ){
-        // TODO: 위 로직들을 참고해서 캐시 활용 응답 플로우를 구현해 보세요
-        return null; // 리턴값 플레이스홀딩
     }
 }
