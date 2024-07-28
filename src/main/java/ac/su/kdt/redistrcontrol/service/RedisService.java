@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -39,7 +40,7 @@ public class RedisService {
             String productJsonString = objectMapper.writeValueAsString(product);
             return Boolean.TRUE.equals(
                 redisTemplateDb0.opsForValue().setIfAbsent(
-                    transactionKey, productJsonString
+                    transactionKey, productJsonString, Duration.ofMinutes(10)
                 )
             );
         } catch (JsonProcessingException e) {
@@ -47,12 +48,14 @@ public class RedisService {
         }
     }
 
-    public Product getProduct(String transactionKey) {
+    public Optional<Product> getProduct(String transactionKey) {
         String productJsonString = redisTemplateDb0.opsForValue().get(transactionKey);
         try {
-            return objectMapper.readValue(productJsonString, Product.class);
+            return Optional.of(
+                objectMapper.readValue(productJsonString, Product.class)
+            );
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            return Optional.empty();
         }
     }
 
@@ -62,21 +65,27 @@ public class RedisService {
     public boolean setObject(String transactionKey, Object object) {
         return Boolean.TRUE.equals(
             redisObjTemplateDb0.opsForValue().setIfAbsent(
-                transactionKey, object
+                transactionKey, object, Duration.ofMinutes(10)
             )
         );
     }
 
-    public Object getObject(String transactionKey, Object object) {
+    public Optional<Object> getObject(String transactionKey, Object object) {
         Object cachedObj = redisObjTemplateDb0.opsForValue().get(transactionKey);
         try {
-            return objectMapper.readValue(
-                Objects.requireNonNull(cachedObj).toString(),
-                object.getClass()
+            return Optional.of(
+                objectMapper.readValue(
+                    Objects.requireNonNull(cachedObj).toString(),
+                    object.getClass()
+                )
             );
         } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
+            return Optional.empty();
         }
+    }
+
+    public boolean deleteKey(String transactionKey) {
+        return Boolean.TRUE.equals(redisTemplateDb0.delete(transactionKey));
     }
 
     // ####################################################
