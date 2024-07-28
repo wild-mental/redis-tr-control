@@ -86,39 +86,39 @@ public class ProductTransactionController {
         @RequestBody ProductForm product
     ){
         // 1. 더미값으로 캐시 키 등록 시도
-        //   1-1. 더미값 캐시 키 등록 성공 시 상품 등록
-        //     1-1-1. 상품 등록 성공 시 등록된 상품 id 를 포함한 상품 데이터 캐싱 시도
-        //       1-1-1-1. 상품 데이터 캐싱 성공 시 응답 반환
-        //       1-1-1-2. 상품 데이터 캐싱 실패 시 상품 Transaction 롤백 후 에러 응답 반환
-        //     1-1-2. 상품 등록 실패 시 키 삭제 후 에러 응답 반환
-        //   1-2. 더미값 캐시 키 등록 실패 시 해당 키로 캐싱된 데이터 read
-        //     1-2-1. 캐싱된 데이터가 상품 데이터로 반환될 경우 응답 반환
-        //     1-2-2. 캐싱된 데이터가 더미값인 경우 2회 재시도하며 상품 데이터로 업데이트 되는지 검사
-        //     1-2-2-1. 재시도 과정에서 상품 데이터로 조회될 경우 응답 반환
-        //     1-2-2-2. 재시도 과정에서 상품 데이터로 조회되지 않을 경우 실패 응답 반환
+        //   1-1. 더미값 캐시 키 등록 실패 시 해당 키로 캐싱된 데이터 read
+        //     1-1-1. 캐싱된 데이터가 더미값인 경우 2회 재시도하며 상품 데이터로 업데이트 되는지 검사
+        //       1-1-1-1. 재시도 과정에서 상품 데이터로 조회되지 않을 경우 실패 응답 반환
+        //       1-1-1-2. 재시도 과정에서 상품 데이터로 조회될 경우 응답 반환
+        //     1-1-2. 캐싱된 데이터가 상품 데이터로 반환될 경우 응답 반환
+        //   1-2. 더미값 캐시 키 등록 성공 시 상품 등록
+        //     1-2-1. 상품 등록 실패 시 키 삭제 후 에러 응답 반환
+        //     1-2-2. 상품 등록 성공 시 등록된 상품 id 를 포함한 상품 데이터 캐싱 시도
+        //       1-2-2-1. 상품 데이터 캐싱 성공 시 응답 반환
+        //       1-2-2-2. 상품 데이터 캐싱 실패 시 상품 Transaction 롤백 후 에러 응답 반환
         return null;  // 응답 place holding
     }
 
     // 3-2) service 클래스로 주요 작업을 넘겨 controller 코드 단순화
     //      setIfAbsentGetIfPresent 메서드 로직 다듬어야 함
-    @PostMapping("/with-cache1")
-    public ResponseEntity<Product> createProduct2(
-        @RequestParam(name = "transaction-key") String transactionKey,
-        @RequestBody ProductForm product
-    ) {
-        // 요청 수신 후, transactionKey 부터 검사
-        Optional<Product> createdProduct = redisService.setIfAbsentGetIfPresent(
-            transactionKey,
-            product.toEntity()  // LocalDateTime.now().toString()
-        );
-        if (createdProduct.isEmpty()) {
-            try {
-                Product createdProductNow = productService.createProduct(product.toEntity());
-                return new ResponseEntity<>(createdProductNow, HttpStatus.CREATED);
-            } catch (Exception e) {
-                return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-            }
-        }
-        return new ResponseEntity<>(createdProduct.get(), HttpStatus.CREATED);
-    }
+//    @PostMapping("/with-cache1")
+//    public ResponseEntity<Product> createProduct2(
+//        @RequestParam(name = "transaction-key") String transactionKey,
+//        @RequestBody ProductForm product
+//    ) {
+//        // 요청 수신 후, transactionKey 부터 검사
+//        Optional<Product> createdProduct = redisService.setIfAbsentGetIfPresent(
+//            transactionKey,
+//            product.toEntity()  // LocalDateTime.now().toString()
+//        );
+//        if (createdProduct.isEmpty()) {
+//            try {
+//                Product createdProductNow = productService.createProduct(product.toEntity());
+//                return new ResponseEntity<>(createdProductNow, HttpStatus.CREATED);
+//            } catch (Exception e) {
+//                return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
+//            }
+//        }
+//        return new ResponseEntity<>(createdProduct.get(), HttpStatus.CREATED);
+//    }
 }
