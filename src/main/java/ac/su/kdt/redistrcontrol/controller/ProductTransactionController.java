@@ -4,7 +4,6 @@ import ac.su.kdt.redistrcontrol.domain.Product;
 import ac.su.kdt.redistrcontrol.domain.ProductForm;
 import ac.su.kdt.redistrcontrol.service.ProductService;
 import ac.su.kdt.redistrcontrol.service.RedisService;
-import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -72,31 +71,62 @@ public class ProductTransactionController {
     public ResponseEntity<Product> readProductCache(
         @RequestParam(name = "transaction-key") String transactionKey
     ) {
-        Product productFromCache = redisService.getProduct(transactionKey);
-        return new ResponseEntity<>(productFromCache, HttpStatus.OK);
+        Optional<Product> productFromCache = redisService.getProduct(transactionKey);
+        return productFromCache.map(
+            product -> new ResponseEntity<>(product, HttpStatus.OK)  // Cache Hit
+        ).orElseGet(
+            () -> new ResponseEntity<>(HttpStatus.NOT_FOUND)         // Cache Fail
+        );
     }
 
     // ####################################################
     // 3) Transaction Key 중복 시 흐름 회복을 적용한 상품 등록
     // ####################################################
-    // 3-1) [과제] setIfAbsent 로직에 대한 상세 핸들링 이해하기
+    // 3-1) setIfAbsent 로직 핸들링 단계 구현
     @PostMapping("/cached-create")
     public ResponseEntity<Product> cachedProductCreate(
         @RequestParam(name = "transaction-key") String transactionKey,
         @RequestBody ProductForm product
     ){
         // 1. 더미값으로 캐시 키 등록 시도
-        //   1-1. 더미값 캐시 키 등록 실패 시 해당 키로 캐싱된 데이터 read
-        //     1-1-1. 캐싱된 데이터가 더미값인 경우 2회 재시도하며 상품 데이터로 업데이트 되는지 검사
-        //       1-1-1-1. 재시도 과정에서 상품 데이터로 조회되지 않을 경우 실패 응답 반환
-        //       1-1-1-2. 재시도 과정에서 상품 데이터로 조회될 경우 응답 반환
-        //     1-1-2. 캐싱된 데이터가 상품 데이터로 반환될 경우 응답 반환
-        //   1-2. 더미값 캐시 키 등록 성공 시 상품 등록
-        //     1-2-1. 상품 등록 실패 시 키 삭제 후 에러 응답 반환
+        boolean isLockObtained = redisService.setIfAbsent(transactionKey, "locked");
+        if (!isLockObtained) {
+            // 1-1. 더미값 캐시 키 등록 실패 시 해당 키로 캐싱된 데이터 read
+            Optional<Product> cachedProduct = redisService.getProduct(transactionKey);
+            if (cachedProduct.isEmpty()) {
+                // 1-1-1. 캐싱된 데이터가 더미값인 경우 2회 재시도하며 상품 데이터로 업데이트 되는지 검사
+                for (int i = 0; i < 2; i++) {
+                    cachedProduct = redisService.getProduct(transactionKey);
+                    // 1-1-1-1. 재시도 과정에서 상품 데이터로 조회될 경우 응답 반환
+                    if (cachedProduct.isPresent()) {
+                        return new ResponseEntity<>(cachedProduct.get(), HttpStatus.OK);
+                    }
+                }
+                //     1-1-1-2. 재시도 과정에서 상품 데이터로 조회되지 않을 경우 실패 응답 반환
+                return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);  // 캐시 에러로 메시지 상세화
+            }
+            // 1-1-2. 캐싱된 데이터가 상품 데이터로 반환될 경우 응답 반환
+            return new ResponseEntity<>(cachedProduct.get(), HttpStatus.OK);
+        }
+        // 1-2. 더미값 캐시 키 등록 성공 시 상품 등록
+        Product createdProduct;
+        try {
+            createdProduct = productService.createProduct(product.toEntity());
+        } catch (RuntimeException e) {
+            // 1-2-1. 상품 등록 실패 시 키 삭제 후 에러 응답 반환
+            redisService.deleteKey(transactionKey);
+            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);  // DB 에러로 메시지 상세화
+        }
         //     1-2-2. 상품 등록 성공 시 등록된 상품 id 를 포함한 상품 데이터 캐싱 시도
-        //       1-2-2-1. 상품 데이터 캐싱 성공 시 응답 반환
-        //       1-2-2-2. 상품 데이터 캐싱 실패 시 상품 Transaction 롤백 후 에러 응답 반환
-        return null;  // 응답 place holding
+        boolean isCached = redisService.setProduct(transactionKey, createdProduct);
+        //       1-2-1-1. 상품 데이터 캐싱 성공 시 응답 반환
+        if (isCached) {
+            return new ResponseEntity<>(createdProduct, HttpStatus.CREATED);
+        }
+        //       1-2-1-2. 상품 데이터 캐싱 실패 시 transaction 키 삭제 및 상품 Transaction 롤백 후 에러 응답 반환
+        redisService.deleteKey(transactionKey);
+        productService.deleteProduct(createdProduct.getId());
+        return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);  // 캐시 에러로 메시지 상세화
     }
 
     // 3-2) service 클래스로 주요 작업을 넘겨 controller 코드 단순화
