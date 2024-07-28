@@ -28,8 +28,6 @@ public class ProductResponseDTO {
             product.getPrice(),
             product.getStockQuantity(),
             product.getSalesQuantity(),
-//            CategoryResponseDTO.fromCategory(product.getCategory())
-//            CategoryResponseDTO.fromCategoryWithParentsList(product.getCategory())
             CategoryResponseDTO.fromCategoryWithParentsUrlList(product.getCategory())
         );
     }
