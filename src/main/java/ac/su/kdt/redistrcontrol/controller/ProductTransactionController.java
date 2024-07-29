@@ -99,6 +99,7 @@ public class ProductTransactionController {
                     cachedProduct = redisService.getProduct(transactionKey);
                     // 1-1-1-1. 재시도 과정에서 상품 데이터로 조회될 경우 응답 반환
                     if (cachedProduct.isPresent()) {
+                        // [회복] 앞선 DB Write 작업의 결과값을 읽어와서 회복 응답을 수행
                         return new ResponseEntity<>(cachedProduct.get(), HttpStatus.OK);
                     }
                 }
@@ -106,11 +107,13 @@ public class ProductTransactionController {
                 return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);  // 캐시 에러로 메시지 상세화
             }
             // 1-1-2. 캐싱된 데이터가 상품 데이터로 반환될 경우 응답 반환
+            // [회복] 앞선 DB Write 작업의 결과값을 읽어와서 회복 응답을 수행
             return new ResponseEntity<>(cachedProduct.get(), HttpStatus.OK);
         }
         // 1-2. 더미값 캐시 키 등록 성공 시 상품 등록
         Product createdProduct;
         try {
+            // 실제 DB 접근 작업은 아래 라인에서만 수행됨
             createdProduct = productService.createProduct(product.toEntity());
         } catch (RuntimeException e) {
             // 1-2-1. 상품 등록 실패 시 키 삭제 후 에러 응답 반환
